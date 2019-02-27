@@ -3,12 +3,13 @@ library(magrittr)
 
 # 2015年時点メッシュ人口およびメッシュの緯度経度
 population_2015 <- read_csv("population_2015.csv")
-mesh <- read_csv("mesh.csv")
+
+mesh <- read_csv("mesh.csv") %>%
+  inner_join(population_2015, by = "mesh_code") %>%
+  select("mesh_code", "longitude", "latitude")
 
 population_2015 %<>%
-  left_join(mesh, by = "mesh_code") %>%
   gather(key = age, value = population, -mesh_code)
-
 
 
 # 施設利用頻度
@@ -21,7 +22,9 @@ use_frequency <- read_csv("use_frequency.csv", locale = locale(encoding = "cp932
          "産業振興施設",
          "図書館",
          "資料館等",
-         "児童施設")
+         "児童施設",
+         "病院",
+         "スーパー")
 
 use_frequency %<>%
   gather(key = "type", value = "use_frequency", -age)
@@ -52,3 +55,14 @@ commercial_facility <- read_csv("commercial_facility.csv", locale = locale(encod
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
 # 市外利用率
 other_medical_facility_rate <- 0.139
+
+
+
+# 大円距離
+great_circuler_distance <- function(lon1, lat1, lon2, lat2){
+  f <- function(x){
+    x * pi / 180
+  }
+  
+  6378137 * acos(sin(f(lat1)) * sin(f(lat2)) + cos(f(lat1)) * cos(f(lat2)) * cos(f(lon1) - f(lon2)))
+}
