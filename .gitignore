@@ -2,3 +2,4 @@
 honjo-model.cabal
 *~
 /ignore/*
+.Rproj.user
