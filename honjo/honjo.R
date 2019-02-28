@@ -55,7 +55,7 @@ commercial_facility <- read_csv("commercial_facility.csv", locale = locale(encod
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
   nest(-type)
 # 市外利用率
-other_medical_facility_rate <- 0.139
+other_medical_facility_rate <- 0.225
 
 
 
@@ -67,3 +67,6 @@ great_circuler_distance <- function(lon1, lat1, lon2, lat2){
   
   6378137 * acos(sin(f(lat1)) * sin(f(lat2)) + cos(f(lat1)) * cos(f(lat2)) * cos(f(lon1) - f(lon2)))
 }
+
+
+
