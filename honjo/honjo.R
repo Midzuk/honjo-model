@@ -24,9 +24,7 @@ use_frequency <- read_csv("use_frequency.csv", locale = locale(encoding = "cp932
          "資料館等",
          "児童施設",
          "病院",
-         "スーパー")
-
-use_frequency %<>%
+         "スーパー") %>%
   gather(key = "type", value = "use_frequency", -age)
 
 
@@ -42,17 +40,20 @@ bus_stop <- read_csv("bus_stop.csv", locale = locale(encoding = "cp932")) %>%
 
 # 公共施設
 public_facility <- read_csv("public_facility.csv", locale = locale(encoding = "cp932")) %>%
-  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
+  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
+  nest(-type)
 
 # 医療施設
 medical_facility <- read_csv("medical_facility.csv", locale = locale(encoding = "cp932")) %>%
-  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
+  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
+  nest(-type)
 # 市外または病院以外利用率
 other_medical_facility_rate <- 0.576
 
 # 商業施設
 commercial_facility <- read_csv("commercial_facility.csv", locale = locale(encoding = "cp932")) %>%
-  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
+  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
+  nest(-type)
 # 市外利用率
 other_medical_facility_rate <- 0.139
 
