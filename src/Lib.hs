@@ -20,23 +20,21 @@ type Longitude = Double
 type Latitude = Double
 data Mesh = Mesh MeshCode Longitude Latitude deriving (Show)
 
-instance FromNamedRecord LinkCsvOut where
+instance FromNamedRecord Mesh where
   parseNamedRecord m =
-    LinkCsvOut
-      <$> m .: "node_id_org"
-      <*> m .: "node_id_dest"
-      <*> m .: "distance"
+    Mesh
+      <$> m .: "mesh_code"
+      <*> m .: "longitude"
+      <*> m .: "latitude"
 
 
 
-type LinkCsv = V.Vector LinkCsvOut
-
-decodeLinkCsv :: FilePath -> IO LinkCsv
-decodeLinkCsv fp = do
+decodeMesh :: FilePath -> IO (V.Vector Mesh)
+decodeMesh fp = do
   cd <- Dir.getCurrentDirectory
   bs <- B.readFile (cd <> fp)
-  let Right (_, ls) = decodeByName bs :: Either String (Header, LinkCsv)
-  return ls
+  let Right (_, ms) = decodeByName bs :: Either String (Header, V.Vector Mesh)
+  return ms
 
 
 
