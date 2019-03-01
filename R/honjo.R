@@ -80,3 +80,8 @@ medical_facility_lonlat <- medical_facility %>%
   select(type, num, longitude, latitude)
 commercial_facility <- commercial_facility %>%
   select(type, num, longitude, latitude)
+
+facility_lonlat <- bind_rows(public_facility_lonlat,
+                             medical_facility_lonlat,
+                             commercial_facility
+                             )
