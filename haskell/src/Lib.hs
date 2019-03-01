@@ -1,15 +1,18 @@
-module Lib
-    ( someFunc
-    ) where
+{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE OverloadedLists   #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+module Lib where
 
 import qualified Data.ByteString.Lazy as B
 import           Data.Csv             (FromNamedRecord (..), Header,
                                         decodeByName, (.:))
+import qualified Data.Vector as V
+import qualified System.Directory as Dir
+
 -- import qualified Data.Map.Lazy        as Map
 -- import           Data.Maybe           (isJust)
 -- import qualified Data.Text            as T
--- import qualified Data.Vector          as V
--- import qualified System.Directory     as Dir
 -- import qualified Data.Set             as Set
 -- import           Data.Foldable        (minimumBy)
 -- import           Data.Function        (on) 
@@ -36,15 +39,13 @@ decodeMesh fp = do
 
 
 type Type = B.ByteString
-type Num = Int
-data Facility = Facility Type Num Longitude Latitude deriving Show
+data Facility = Facility Type Int Longitude Latitude deriving Show
 
 instance FromNamedRecord Facility where
   parseNamedRecord m =
-    NodeCsvOut
+    Facility
       <$> m .: "type"
       <*> m .: "num"
-      <*> m .: "mesh_code"
       <*> m .: "longitude"
       <*> m .: "latitude"
 
@@ -57,17 +58,27 @@ decodeFacility fp = do
 
 
 
+distance :: Mesh -> Facility -> (MeshCode, Type, Int, Double)
+distance (Mesh mc lon1 lat1) (Facility t n lon2 lat2) =
+  (mc, t, n, grtCirDist (lon1, lat1) (lon2, lat2))
 
-    
 
-encodePath :: NodeCsv -> Path -> String
-encodePath nc (graph -> g) =
-  "node_id,latitude,longitude"
+grtCirDist :: (Longitude, Latitude) -> (Longitude, Latitude) -> Double
+grtCirDist (lon1, lat1) (lon2, lat2) =
+  6378137 * acos (sin (f lat1) * sin (f lat2) + cos (f lat1) * cos (f lat2) * cos (f lon1 - f lon2))
+  where
+    f = ((pi / 180) *)
+
+encodeDist :: V.Vector (MeshCode, Type, Int, Double) -> String
+encodeDist xs =
+  "mesh_code,type,num,distance"
     <> foldr
-      (\ ni str ->
+      (\ (mc, t, n, d) str ->
           str
             <> "\n"
-            <> show ni <> ","
-            <> show (latitude $ nc Map.! ni) <> ","
-            <> show (longitude $ nc Map.! ni))
-      "" g
+            <> show mc <> ","
+            <> show t <> ","
+            <> show n <> ","
+            <> show d
+      )
+      "" xs

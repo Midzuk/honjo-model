@@ -1,15 +1,15 @@
 module Main where
 
-import Lib
+import qualified System.Directory as Dir
+
+import           Lib
 
 main :: IO ()
 main = do
-  lc <- decodeLinkCsv "/output/simple_links.csv"
-  nc <- decodeNodeCsv "/output/simple_nodes.csv"
-  
-  let (p, dorg, ddest) = shortestPathCSV od nc lc
+  ms <- decodeMesh "/input/mesh_honjo.csv"
+  fs <- decodeFacility "/input/facility_lonlat.csv"
+
+  let xs = distance <$> ms <*> fs
 
   cd <- Dir.getCurrentDirectory
-  writeFile (cd <> "/output/path/path.csv") $ encodePath nc p
-
-  print (costLink $ cost p, dorg, ddest)
+  writeFile (cd <> "/output/distance.csv") $ encodeDist xs
