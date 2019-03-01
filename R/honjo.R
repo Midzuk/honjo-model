@@ -15,18 +15,18 @@ mesh_codes <- mesh[,1]
 
 
 # 施設利用頻度
-use_frequency <- read_csv("use_frequency.csv", locale = locale(encoding = "cp932")) %>%
+use_frequency <- read_csv("use_frequency.csv") %>%
   select("age",
-         "公民館",
-         "市民活動施設",
-         "文化施設",
-         "スポーツ施設",
-         "産業振興施設",
-         "図書館",
-         "資料館等",
-         "児童施設",
-         "病院",
-         "スーパー") %>%
+         "kominkan",
+         "shiminkatsudo",
+         "bunka",
+         "sports",
+         "sangyoshinko",
+         "toshokan",
+         "shiryokanto",
+         "jido",
+         "byoin",
+         "super") %>%
   gather(key = "type", value = "use_frequency", -age)
 
 facility_type <- use_frequency %>%
@@ -45,17 +45,17 @@ facility_type <- facility_type[,1]
 
 
 # 公共施設
-public_facility <- read_csv("public_facility.csv", locale = locale(encoding = "cp932")) %>%
+public_facility <- read_csv("public_facility.csv") %>%
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
 
 # 医療施設
-medical_facility <- read_csv("medical_facility.csv", locale = locale(encoding = "cp932")) %>%
+medical_facility <- read_csv("medical_facility.csv") %>%
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
 # 市外または病院以外利用率
 other_medical_facility_rate <- 0.576
 
 # 商業施設
-commercial_facility <- read_csv("commercial_facility.csv", locale = locale(encoding = "cp932")) %>%
+commercial_facility <- read_csv("commercial_facility.csv") %>%
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
 # 市外利用率
 other_medical_facility_rate <- 0.225
@@ -73,3 +73,10 @@ great_circuler_distance <- function(lon1, lat1, lon2, lat2){
 
 
 
+# 施設緯度経度
+public_facility_lonlat <- public_facility %>%
+  select(type, num, longitude, latitude)
+medical_facility_lonlat <- medical_facility %>%
+  select(type, num, longitude, latitude)
+commercial_facility <- commercial_facility %>%
+  select(type, num, longitude, latitude)
