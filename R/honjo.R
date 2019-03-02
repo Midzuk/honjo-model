@@ -85,3 +85,5 @@ facility_lonlat <- bind_rows(public_facility_lonlat,
                              medical_facility_lonlat,
                              commercial_facility
                              )
+
+distance <- read_csv("distance.csv")
