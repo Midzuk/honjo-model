@@ -9,10 +9,10 @@ mesh <- read_csv("mesh.csv") %>%
   select("mesh_code", "longitude", "latitude")
 
 population_2015 %<>%
-  gather(key = age, value = population, -mesh_code)
+  gather(key = age, value = population, -mesh_code) %>%
+  split(.$mesh_code)
 
 mesh_codes <- mesh[,1]
-
 
 # 施設利用頻度
 use_frequency <- read_csv("use_frequency.csv") %>%
