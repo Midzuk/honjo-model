@@ -46,30 +46,37 @@ facility_type <- facility_type[,1]
 
 # 公共施設
 public_facility <- read_csv("public_facility.csv") %>%
-  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
+  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
+  select(-name)
+
+public_facility_type <- public_facility %>%
+  nest(-type) %>%
+  pull(type)
 
 # 医療施設
 medical_facility <- read_csv("medical_facility.csv") %>%
-  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
+  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
+  select(-name)
 # 市外または病院以外利用率
 other_medical_facility_rate <- 0.576
 
 # 商業施設
 commercial_facility <- read_csv("commercial_facility.csv") %>%
-  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100)
+  mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
+  select(-name)
 # 市外利用率
 other_medical_facility_rate <- 0.225
 
 
 
 # 大円距離
-great_circuler_distance <- function(lon1, lat1, lon2, lat2){
-  f <- function(x){
-    x * pi / 180
-  }
-  
-  6378137 * acos(sin(f(lat1)) * sin(f(lat2)) + cos(f(lat1)) * cos(f(lat2)) * cos(f(lon1) - f(lon2)))
-}
+# great_circuler_distance <- function(lon1, lat1, lon2, lat2){
+#   f <- function(x){
+#     x * pi / 180
+#   }
+#  
+#   6378137 * acos(sin(f(lat1)) * sin(f(lat2)) + cos(f(lat1)) * cos(f(lat2)) * cos(f(lon1) - f(lon2)))
+# }
 
 
 
@@ -86,4 +93,10 @@ facility_lonlat <- bind_rows(public_facility_lonlat,
                              commercial_facility
                              )
 
-distance <- read_csv("distance.csv")
+
+
+distance <- read_csv("distance.csv") %>%
+  split(.$type) %>%
+  map(~ split(.x, .$mesh_code) %>%
+        map(~ filter(., distance == min(distance))))
+
