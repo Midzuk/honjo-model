@@ -12,7 +12,7 @@ population_2015 %<>%
   gather(key = age, value = population, -mesh_code) %>%
   split(.$mesh_code)
 
-mesh_codes <- mesh[,1]
+mesh_codes <- mesh$mesh_code
 
 # 施設利用頻度
 use_frequency <- read_csv("use_frequency.csv") %>%
@@ -27,11 +27,10 @@ use_frequency <- read_csv("use_frequency.csv") %>%
          "jido",
          "byoin",
          "super") %>%
-  gather(key = "type", value = "use_frequency", -age)
+  gather(key = "type", value = "use_frequency", -age) %>%
+  split(.$type)
 
-facility_type <- use_frequency %>%
-  nest(-type)
-facility_type <- facility_type[,1]
+facility_type <- names(use_frequency)
 
 
 
@@ -100,3 +99,22 @@ distance <- read_csv("distance.csv") %>%
   map(~ split(.x, .$mesh_code) %>%
         map(~ filter(., distance == min(distance))))
 
+
+
+# for (t in facility_type) {
+#   for (m in mesh_codes) {
+#     
+#   }
+# }
+
+facility_user <- facility_lonlat %>%
+  mutate(user = NA) %>%
+  split(.$type)
+
+
+
+list(facility_user, distance, use_frequency) %>%
+  pmap(~ 1 : nrow(..1) %>%
+         map(function(x) {
+           ..1$user[x] <- 1
+         }))
