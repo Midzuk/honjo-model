@@ -108,13 +108,64 @@ distance <- read_csv("distance.csv") %>%
 # }
 
 facility_user <- facility_lonlat %>%
-  mutate(user = NA) %>%
+  select(type, num) %>%
+  mutate(user = 0, distance = 0) %>%
   split(.$type)
 
 
 
-list(facility_user, distance, use_frequency) %>%
-  pmap(~ 1 : nrow(..1) %>%
-         map(function(x) {
-           ..1$user[x] <- 1
-         }))
+# list(facility_user, distance, use_frequency) %>%
+#   pmap(~ 1 : nrow(..1) %>%
+#          map(function(x) {
+#            ..1$user[x] <- 1
+#          }))
+
+# 副作用あり (2度回さないこと)
+1 : length(distance) %>%
+  map(function(i) { # i : 施設
+    1 : length(distance[[i]]) %>%
+      map(function(j) { # j : メッシュ
+        num <- distance[[i]][[j]]$num + 1
+        facility_user[[i]][num,]$user <<-
+          1 : nrow(population_2015[[j]]) %>%
+          map_dbl(function(k) { # k : 年齢
+            population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency
+          }) %>%
+          sum() + facility_user[[i]][num,]$user
+      })
+  })
+
+
+
+# test => OK
+total_user <- tribble(~type, ~user,
+                      "bunka", 0,
+                      "byoin", 0,
+                      "jido", 0,
+                      "kominkan", 0,
+                      "sangyoshinko", 0,
+                      "shiminkatsudo", 0,
+                      "shiryokanto", 0,
+                      "sports", 0,
+                      "super", 0,
+                      "toshokan",0
+                      )
+
+
+# for文でよい
+1 : length(facility_user) %>%
+  map(function(i) { # i : 施設
+    total_user[i,]$user <<-
+      1 : length(population_2015) %>%
+        map_dbl(function(j) { # j : メッシュ
+          1 : nrow(population_2015[[j]]) %>%
+            map_dbl(function(k) { # k : 年齢
+              population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency
+            }) %>%
+            sum()
+      }) %>%
+      sum() + total_user[i,]$user
+  })
+
+
+
