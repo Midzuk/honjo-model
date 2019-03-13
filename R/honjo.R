@@ -2,9 +2,9 @@ library(tidyverse)
 library(magrittr)
 
 # 2015年時点メッシュ人口およびメッシュの緯度経度
-population_2015 <- read_csv("population_2015.csv")
+population_2015 <- read_csv("old/population_2015.csv")
 
-mesh <- read_csv("mesh.csv") %>%
+mesh <- read_csv("old/mesh_new.csv") %>%
   inner_join(population_2015, by = "mesh_code") %>%
   select("mesh_code", "longitude", "latitude")
 
@@ -15,7 +15,7 @@ population_2015 %<>%
 mesh_codes <- mesh$mesh_code
 
 # 施設利用頻度
-use_frequency <- read_csv("use_frequency.csv") %>%
+use_frequency <- read_csv("old/use_frequency.csv") %>%
   select("age",
          "kominkan",
          "shiminkatsudo",
@@ -44,7 +44,7 @@ facility_type <- names(use_frequency)
 
 
 # 公共施設
-public_facility <- read_csv("public_facility.csv") %>%
+public_facility <- read_csv("old/public_facility.csv") %>%
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
   select(-name)
 
@@ -53,14 +53,14 @@ public_facility_type <- public_facility %>%
   pull(type)
 
 # 医療施設
-medical_facility <- read_csv("medical_facility.csv") %>%
+medical_facility <- read_csv("old/medical_facility.csv") %>%
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
   select(-name)
 # 市外または病院以外利用率
 other_medical_facility_rate <- 0.576
 
 # 商業施設
-commercial_facility <- read_csv("commercial_facility.csv") %>%
+commercial_facility <- read_csv("old/commercial_facility.csv") %>%
   mutate(use_rate = as.numeric(sub("%", "", use_rate)) / 100) %>%
   select(-name)
 # 市外利用率
@@ -94,12 +94,28 @@ facility_lonlat <- bind_rows(public_facility_lonlat,
 
 
 
-distance <- read_csv("distance.csv") %>%
+distance <- read_csv("old/distance.csv") %>%
   split(.$type) %>%
   map(~ split(.x, .$mesh_code) %>%
-        map(~ filter(., distance == min(distance))))
+        map(~ filter(., distance == min(distance))) %>%
+        map(~ .[1,])
+      )
 
 
+#　test 重複確認 => 問題なし
+distance1 <- read_csv("distance.csv") %>%
+  split(.$type) %>%
+  map(~ split(.x, .$mesh_code) %>%
+        map(~ filter(., distance == min(distance)))
+  ) 
+
+for (i in 1 : length(distance1)) {
+  for (j in 1 : length(distance1[[i]])) {
+    if (nrow(distance1[[i]][[j]]) > 1) {
+      print(distance1[[i]][[j]]$type)
+    }
+  }
+}
 
 # for (t in facility_type) {
 #   for (m in mesh_codes) {
@@ -109,33 +125,12 @@ distance <- read_csv("distance.csv") %>%
 
 facility_user <- facility_lonlat %>%
   select(type, num) %>%
-  mutate(user = 0, distance = 0) %>%
+  mutate(user = 0, distance = 0, share = 0) %>%
   split(.$type)
 
-
-
-# list(facility_user, distance, use_frequency) %>%
-#   pmap(~ 1 : nrow(..1) %>%
-#          map(function(x) {
-#            ..1$user[x] <- 1
-#          }))
-
-# 副作用あり (2度回さないこと)
-1 : length(distance) %>%
-  map(function(i) { # i : 施設
-    1 : length(distance[[i]]) %>%
-      map(function(j) { # j : メッシュ
-        num <- distance[[i]][[j]]$num + 1
-        facility_user[[i]][num,]$user <<-
-          1 : nrow(population_2015[[j]]) %>%
-          map_dbl(function(k) { # k : 年齢
-            population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency
-          }) %>%
-          sum() + facility_user[[i]][num,]$user
-      })
-  })
-
-
+facility_user1 <- facility_lonlat %>%
+  select(type, num) %>%
+  mutate(user = 0, distance = 0, share = 0)
 
 # test => OK
 total_user <- tribble(~type, ~user,
@@ -149,7 +144,7 @@ total_user <- tribble(~type, ~user,
                       "sports", 0,
                       "super", 0,
                       "toshokan",0
-                      )
+)
 
 
 # for文でよい
@@ -157,15 +152,72 @@ total_user <- tribble(~type, ~user,
   map(function(i) { # i : 施設
     total_user[i,]$user <<-
       1 : length(population_2015) %>%
-        map_dbl(function(j) { # j : メッシュ
-          1 : nrow(population_2015[[j]]) %>%
-            map_dbl(function(k) { # k : 年齢
-              population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency
-            }) %>%
-            sum()
+      map_dbl(function(j) { # j : メッシュ
+        1 : nrow(population_2015[[j]]) %>%
+          map_dbl(function(k) { # k : 年齢
+            population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency
+          }) %>%
+          sum()
       }) %>%
       sum() + total_user[i,]$user
   })
 
 
 
+# list(facility_user, distance, use_frequency) %>%
+#   pmap(~ 1 : nrow(..1) %>%
+#          map(function(x) {
+#            ..1$user[x] <- 1
+#          }))
+
+# 副作用あり (2度回さないこと)
+for (i in 1 : length(distance)) {
+  for (j in 1 : length(distance[[i]])) {
+    num <- distance[[i]][[j]]$num + 1
+    facility_user[[i]][num,]$user <-
+      1 : nrow(population_2015[[j]]) %>%
+      map_dbl(function(k) { # k : 年齢
+        population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency
+      }) %>%
+      sum() + facility_user[[i]][num,]$user
+    facility_user[[i]][num,]$distance <-
+      1 : nrow(population_2015[[j]]) %>%
+      map_dbl(function(k) { # k : 年齢
+        (population_2015[[j]][k,]$population * use_frequency[[i]][k,]$use_frequency) * distance[[i]][[j]]$distance
+      }) %>%
+      sum() + facility_user[[i]][num,]$distance
+  }
+}
+
+
+
+# シェア算出
+for (i in 1 : length(facility_user)) {
+  for (num in 1 : nrow(facility_user[[i]])) {
+    facility_user[[i]][num,]$share <- facility_user[[i]][num,]$user / total_user[i,]$user
+  }
+}
+
+
+
+# 出力用
+facility_user_out <- 1 : length(facility_user) %>%
+  map_dfr(~ facility_user[[.]]) %>%
+  left_join(public_facility, by = c("type", "num")) %>%
+  left_join(medical_facility, by = c("type", "num")) %>%
+  left_join(commercial_facility, by = c("type", "num"))
+
+
+
+for (j in 1 : length(distance[[1]])) {
+  num <- distance[[1]][[j]]$num + 1
+  a <-
+    1 : nrow(population_2015[[j]]) %>%
+    map_dbl(function(k) { # k : 年齢
+      population_2015[[j]][k,]$population * use_frequency[[1]][k,]$use_frequency
+    }) %>% sum()
+  # print(paste(num, ",", a))
+  if (a > 1000) {
+    print(paste(num, ",", j))
+  }
+}
