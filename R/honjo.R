@@ -93,7 +93,7 @@ facility_lonlat <- bind_rows(public_facility_lonlat,
                              )
 
 
-
+# Haskellで算出したものを利用
 distance <- read_csv("old/distance.csv") %>%
   split(.$type) %>%
   map(~ split(.x, .$mesh_code) %>%
@@ -103,7 +103,7 @@ distance <- read_csv("old/distance.csv") %>%
 
 
 #　test 重複確認 => 問題なし
-distance1 <- read_csv("distance.csv") %>%
+distance1 <- read_csv("old/distance.csv") %>%
   split(.$type) %>%
   map(~ split(.x, .$mesh_code) %>%
         map(~ filter(., distance == min(distance)))
@@ -209,15 +209,4 @@ facility_user_out <- 1 : length(facility_user) %>%
 
 
 
-for (j in 1 : length(distance[[1]])) {
-  num <- distance[[1]][[j]]$num + 1
-  a <-
-    1 : nrow(population_2015[[j]]) %>%
-    map_dbl(function(k) { # k : 年齢
-      population_2015[[j]][k,]$population * use_frequency[[1]][k,]$use_frequency
-    }) %>% sum()
-  # print(paste(num, ",", a))
-  if (a > 1000) {
-    print(paste(num, ",", j))
-  }
-}
+
