@@ -210,3 +210,32 @@ facility_user_out <- 1 : length(facility_user) %>%
 
 
 
+# Haskellで算出したものを利用
+distance1 <- read_csv("old/distance.csv") %>%
+  split(.$type) %>%
+  map(~ split(., .$mesh_code) %>%
+        map(~ split(., .$num))
+  )
+
+public_facility1 <- public_facility %>%
+  split(.$type) %>%
+  map(~ split(., .$num))
+
+public_facility1_name <- names(public_facility1)
+
+f <- function(i, x) {
+  # public : 1-8
+  if (1 <= i && i <= 8) {
+    # public_facility1
+  }
+  
+  # commercial : 9
+  if (i == 9) {
+    
+  }
+  
+  # medical : 
+  if (i == 10) {
+    
+  }
+}
