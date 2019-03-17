@@ -226,16 +226,20 @@ public_facility1_name <- names(public_facility1)
 f <- function(i, x) {
   # public : 1-8
   if (1 <= i && i <= 8) {
-    # public_facility1
+    for (j in length(distance1[[1]])) {
+      # ここから
+      
+      
+    }
   }
   
   # commercial : 9
   if (i == 9) {
-    
+    # ここから
   }
   
   # medical : 
   if (i == 10) {
-    
+    # ここから
   }
 }
