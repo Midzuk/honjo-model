@@ -223,23 +223,203 @@ public_facility1 <- public_facility %>%
 
 public_facility1_name <- names(public_facility1)
 
-f <- function(i, x) {
-  # public : 1-8
-  if (1 <= i && i <= 8) {
-    for (j in length(distance1[[1]])) {
-      # ここから
+commercial_facility1 <- commercial_facility %>%
+  split(.$num)
+
+medical_facility1 <- medical_facility %>%
+  split(.$num)
+
+# 2015年時点メッシュ人口およびメッシュの緯度経度
+population_2015_1 <- read_csv("old/population_2015.csv")
+
+population_2015_1 %<>%
+  gather(key = age, value = population, -mesh_code) %>%
+  split(.$mesh_code) %>%
+  map(~ split(., .$age))
+
+
+
+# 施設利用頻度
+use_frequency1 <- read_csv("old/use_frequency.csv") %>%
+  select("age",
+         "kominkan",
+         "shiminkatsudo",
+         "bunka",
+         "sports",
+         "sangyoshinko",
+         "toshokan",
+         "shiryokanto",
+         "jido",
+         "byoin",
+         "super") %>%
+  gather(key = "type", value = "use_frequency", -age) %>%
+  split(.$type) %>%
+  map(~ split(., .$age))
+
+
+# xは正のみ
+calc_use_rate <- function(i, x) {
+  users <- rep(0, length(distance1[[i]][[1]])) # 汚い
+  use_rates <- rep(0, length(distance1[[i]][[1]])) # 汚い
+  
+  for (j in 1 : length(distance1[[i]])) { # j : メッシュ
+    sum = 0
+    us <- rep(0, length(distance1[[i]][[j]]))
+    
+    distance_min <- distance1[[i]][[j]][[1]]$distance
+    
+    for (k in 2 : length(distance1[[i]][[j]])) { # k : 施設番号
+      if (distance1[[i]][[j]][[k]]$distance < distance_min) {
+        distance_min <- distance1[[i]][[j]][[k]]$distance
+      }
+    }
+    
+    for (k in 1 : length(distance1[[i]][[j]])) { # k : 施設番号
+      s <- 0
       
+      if (i == 2) { # 病院
+        s <- medical_facility1[[k]]$hospital_bed
+      } else if (i == 9) { # スーパー
+        s <- commercial_facility1[[k]]$area_m2
+      } else {
+        if (i >= 3 && i <= 8) {
+          i2 <- i - 1
+        } else if (i == 10) {
+          i2 <- 8
+        } else {
+          i2 <- i
+        }
+        
+        s <- public_facility1[[i2]][[k]]$area_m2
+      }
       
+      us[k] <- s * exp(- x * (distance1[[i]][[j]][[k]]$distance - distance_min))
+    }
+    
+    # メッシュ上の利用者数合計
+    user <- 1 : length(population_2015_1[[j]]) %>%
+      map_dbl(function(k) { # k : 年齢
+        population_2015_1[[j]][[k]]$population * use_frequency1[[i]][[k]]$use_frequency
+      }) %>%
+      sum()
+    
+    for (k in 1 : length(distance1[[i]][[j]])) {
+      p <- us[k] / sum(us) # あるメッシュある施設の施設選択率
+
+      # 年齢ごとの利用回数合計
+      users[k] <- users[k] + p * user
     }
   }
   
-  # commercial : 9
-  if (i == 9) {
-    # ここから
+  for (k in 1 : length(distance1[[i]][[1]])) {
+    use_rates[k] <- users[k] / sum(users)
+  }
+
+  return(use_rates)
+}
+
+
+
+# xは正のみ
+# ハフモデル(対数じゃない版)
+calc_use_rate1 <- function(i, x) {
+  users <- rep(0, length(distance1[[i]][[1]])) # 汚い
+  use_rates <- rep(0, length(distance1[[i]][[1]])) # 汚い
+  
+  for (j in 1 : length(distance1[[i]])) { # j : メッシュ
+    sum = 0
+    us <- rep(0, length(distance1[[i]][[j]]))
+  
+    distance_max <- 0
+    
+    for (k in 2 : length(distance1[[i]][[j]])) { # k : 施設番号
+      if (distance1[[i]][[j]][[k]]$distance > distance_max) {
+        distance_max <- distance1[[i]][[j]][[k]]$distance
+      }
+    }
+    
+    for (k in 1 : length(distance1[[i]][[j]])) { # k : 施設番号
+      s <- 0
+      
+      if (i == 2) { # 病院
+        s <- medical_facility1[[k]]$hospital_bed
+      } else if (i == 9) { # スーパー
+        s <- commercial_facility1[[k]]$area_m2
+      } else {
+        if (i >= 3 && i <= 8) {
+          i2 <- i - 1
+        } else if (i == 10) {
+          i2 <- 8
+        } else {
+          i2 <- i
+        }
+        
+        s <- public_facility1[[i2]][[k]]$area_m2
+      }
+      
+      us[k] <- s / (distance1[[i]][[j]][[k]]$distance / distance_max) ^ x
+    }
+    
+    # メッシュ上の利用者数合計
+    user <- 1 : length(population_2015_1[[j]]) %>%
+      map_dbl(function(k) { # k : 年齢
+        population_2015_1[[j]][[k]]$population * use_frequency1[[i]][[k]]$use_frequency
+      }) %>%
+      sum()
+    
+    for (k in 1 : length(distance1[[i]][[j]])) {
+      p <- us[k] / sum(us) # あるメッシュある施設の施設選択率
+      
+      # 年齢ごとの利用回数合計
+      users[k] <- users[k] + p * user
+    }
   }
   
-  # medical : 
-  if (i == 10) {
-    # ここから
+  for (k in 1 : length(distance1[[i]][[1]])) {
+    use_rates[k] <- users[k] / sum(users)
   }
+  
+  return(use_rates)
 }
+
+
+
+use_rate_error <- function(i, x) {
+  es <- rep(0, length(distance1[[i]][[1]]))
+  
+  use_rates_est <- calc_use_rate1(i, x)
+  
+  for (k in 1 : length(distance1[[i]][[1]])) { # k : 施設番号
+    if (i == 2) { # 病院
+      use_rate <- medical_facility1[[k]]$use_rate
+    } else if (i == 9) { # スーパー
+      use_rate <- commercial_facility1[[k]]$use_rate
+    } else {
+      if (i >= 3 && i <= 8) {
+        i2 <- i - 1
+      } else if (i == 10) {
+        i2 <- 8
+      } else {
+        i2 <- i
+      }
+      use_rate <- public_facility1[[i2]][[k]]$use_rate
+    }
+    
+    es[k] <- (use_rates_est[k] - use_rate) ^ 2
+  }
+  
+  return(sum(es))
+}
+
+#           x          error
+# i == 1 => 0.6398631, 1.010923e-12
+# i == 2 => 2.010507, 0.00343115
+# i == 3 => 0.853016, 5.795824e-13
+# i == 4 => 1.209198, 0.004022097
+# i == 5 => 0       , - # 直線距離に依存しない
+# i == 6 => 1.738493, 0.01302915
+# i == 7 => 0       , - # 直線距離に依存しない
+# i == 8 => 0.8526133, 0.002382758
+# i == 9 => 0       , - # 直線距離に依存しない
+# i == 10 => ∞      , - # 完全に直線距離に依存
+
