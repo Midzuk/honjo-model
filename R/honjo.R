@@ -277,6 +277,7 @@ calc_use_rate <- function(i, x) {
     for (k in 1 : length(distance1[[i]][[j]])) { # k : 施設番号
       s <- 0
       
+      # 汚い
       if (i == 2) { # 病院
         s <- medical_facility1[[k]]$hospital_bed
       } else if (i == 9) { # スーパー
@@ -412,14 +413,146 @@ use_rate_error <- function(i, x) {
 }
 
 #           x          error
-# i == 1 => 0.6398631, 1.010923e-12
-# i == 2 => 2.010507, 0.00343115
-# i == 3 => 0.853016, 5.795824e-13
-# i == 4 => 1.209198, 0.004022097
-# i == 5 => 0       , - # 直線距離に依存しない
-# i == 6 => 1.738493, 0.01302915
-# i == 7 => 0       , - # 直線距離に依存しない
-# i == 8 => 0.8526133, 0.002382758
-# i == 9 => 0       , - # 直線距離に依存しない
-# i == 10 => ∞      , - # 完全に直線距離に依存
+# 文化 i == 1 => 0.6398631, 1.010923e-12
+# 病院 i == 2 => 2.010507, 0.00343115
+# 児童 i == 3 => 0.853016, 5.795824e-13
+# 公民 i == 4 => 1.209198, 0.004022097
+# 産業 i == 5 => 0       , - # 直線距離に依存しない
+# 市民 i == 6 => 1.738493, 0.01302915
+# 資料 i == 7 => 0       , - # 直線距離に依存しない
+# スポ i == 8 => 0.8526133, 0.002382758
+# スパ i == 9 => 0       , - # 直線距離に依存しない
+# 図書 i == 10 => ∞      , - # 完全に直線距離に依存
+
+x <- c(0.6398631, 2.010507, 0.853016, 1.209198, 0, 1.738493, 0, 0.8526133, 0) # 変数
+
+distance2 <- distance1
+
+# 利用率
+for (i in 1 : length(distance1)) { # i: 施設種別
+  for (j in 1 : length(distance1[[i]])) { # j: メッシュ
+    for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
+      distance2[[i]][[j]][[k]] %<>%
+        mutate(huff = NA, use_rate = NA, user = NA, userXdistance = NA) %>%
+        select(huff, use_rate, user, userXdistance)
+    }
+  }
+}
+
+# 利用率
+for (i in 1 : (length(distance1) - 1)) { # i: 施設種別 (図書館除く)
+  for (j in 1 : length(distance1[[i]])) { # j: メッシュ
+    for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
+      if (i == 2) { # 病院
+        s <- medical_facility1[[k]]$hospital_bed
+      } else if (i == 9) { # スーパー
+        s <- commercial_facility1[[k]]$area_m2
+      } else {
+        if (i >= 3 && i <= 8) {
+          i2 <- i - 1
+        } else if (i == 10) {
+          i2 <- 8
+        } else {
+          i2 <- i
+        }
+        
+        s <- public_facility1[[i2]][[k]]$area_m2
+      }
+    
+      distance2[[i]][[j]][[k]]$huff <- s / distance1[[i]][[j]][[k]]$distance ^ x[i]
+    }
+    
+    sum <- 0
+    for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
+      sum <- sum + distance2[[i]][[j]][[k]]$huff
+    }
+    
+    for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
+      distance2[[i]][[j]][[k]]$use_rate <- distance2[[i]][[j]][[k]]$huff / sum
+    }
+    
+    # メッシュ上の利用者数合計
+    user <- 1 : length(population_2015_1[[j]]) %>%
+      map_dbl(function(k) { # k : 年齢
+        population_2015_1[[j]][[k]]$population * use_frequency1[[i]][[k]]$use_frequency
+      }) %>%
+      sum()
+    
+    for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
+      distance2[[i]][[j]][[k]]$user <- user * distance2[[i]][[j]][[k]]$use_rate
+      
+      distance2[[i]][[j]][[k]]$userXdistance <- distance2[[i]][[j]][[k]]$user * distance1[[i]][[j]][[k]]$distance
+    }
+  }
+}
+
+# 図書館
+for (j in 1 : length(distance1[[10]])) { # j: メッシュ
+  distance_min <- distance1[[10]][[j]][[1]]$distance
+  
+  for (k in 2 : length(distance1[[10]][[j]])) { # k: 施設
+    if (distance1[[10]][[j]][[k]]$distance < distance_min) {
+      distance_min <- distance1[[10]][[j]][[k]]$distance
+    }
+  }
+  
+  for (k in 1 : length(distance1[[10]][[j]])) {
+    if (distance1[[10]][[j]][[k]]$distance == distance_min) {
+      distance2[[10]][[j]][[k]]$use_rate <- 1
+    } else {
+      distance2[[10]][[j]][[k]]$use_rate <- 0
+    }
+  }
+  
+  # メッシュ上の利用者数合計
+  user <- 1 : length(population_2015_1[[j]]) %>%
+    map_dbl(function(k) { # k : 年齢
+      population_2015_1[[j]][[k]]$population * use_frequency1[[10]][[k]]$use_frequency
+    }) %>%
+    sum()
+  
+  for (k in 1 : length(distance1[[10]][[j]])) { # k: 施設
+    distance2[[10]][[j]][[k]]$user <- user * distance2[[10]][[j]][[k]]$use_rate
+    
+    distance2[[10]][[j]][[k]]$userXdistance <- distance2[[10]][[j]][[k]]$user * distance1[[10]][[j]][[k]]$distance
+  }
+}
+
+use_rate_output <- read_csv("old/distance.csv") %>%
+  select(-distance) %>%
+  mutate(use_rate = NA, user = NA, userXdistance = NA) %>%
+  arrange(mesh_code, type, num) %>%
+  nest(-type, -mesh_code) %>%
+  nest(-type)
+
+for (i in 1 : length(distance1)) { # i: 施設種別
+  for (j in 1 : length(distance1[[i]])) { # j: メッシュ
+    for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
+      use_rate_output[i,]$data[[1]][j,]$data[[1]][k,]$use_rate <- distance2[[i]][[j]][[k]]$use_rate
+      use_rate_output[i,]$data[[1]][j,]$data[[1]][k,]$user <- distance2[[i]][[j]][[k]]$user
+      use_rate_output[i,]$data[[1]][j,]$data[[1]][k,]$userXdistance <- distance2[[i]][[j]][[k]]$userXdistance
+    }
+  }
+}
+
+use_rate_output1 <- use_rate_output %>%
+  unnest(data) %>%
+  unnest(data)
+
+use_rate_disp <- use_rate_output1 %>%
+  nest(-type, -mesh_code) %>%
+  nest(-type)
+
+for (i in 1 : length(distance1)) { # i: 施設種別
+  use_rate_disp[i,]$data[[1]] %<>%
+    mutate(disp = NA)
+  
+  for (j in 1 : length(distance1[[i]])) { # j: メッシュ
+    use_rate_disp[i,]$data[[1]][j,]$disp <- use_rate_disp[i,]$data[[1]][j,]$data[[1]]$use_rate %>% var()
+  }
+}
+
+use_rate_disp1 <- use_rate_disp %>%
+  unnest(data) %>%
+  select(-data)
 
