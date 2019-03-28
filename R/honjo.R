@@ -718,8 +718,11 @@ optim(c(0), function (x) {calc_total_distance1(1,x)}, method = "Brent", lower = 
 # (7789.981, 1084.019)
 # value: 574785264 m
 
-optim(c(0,0,0,0,100), function (x) {calc_total_distance1(2,x)})
+optim(c(0,0,0,0,0), function (x) {calc_total_distance1(2,x)})
+# (52.77539, 53.59706, 92.21750, 154.22759, 133.27675, 94.90571)
+# value: 3472072461 m
 
-for (i in 2:9) {
-  optim(c(0,0,0,0,0), function (x) {calc_total_distance1(i,x)}, method = "SANN")
+
+for (i in 3:9) {
+  optim(rep(0, length(facility$num[[i]]) - 1), function (x) {calc_total_distance1(i,x)}, method = "SANN")
 }
