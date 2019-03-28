@@ -434,12 +434,11 @@ for (i in 1 : length(distance1)) { # i: 施設種別
     for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
       distance2[[i]][[j]][[k]] %<>%
         mutate(huff = NA, use_rate = NA, user = NA, userXdistance = NA) %>%
-        select(huff, use_rate, user, userXdistance)
+        select(huff, use_rate, user, userXdistance, distance)
     }
   }
 }
 
-# 利用率
 for (i in 1 : (length(distance1) - 1)) { # i: 施設種別 (図書館除く)
   for (j in 1 : length(distance1[[i]])) { # j: メッシュ
     for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
@@ -519,7 +518,6 @@ for (j in 1 : length(distance1[[10]])) { # j: メッシュ
 }
 
 use_rate_output <- read_csv("old/distance.csv") %>%
-  select(-distance) %>%
   mutate(use_rate = NA, user = NA, userXdistance = NA) %>%
   arrange(mesh_code, type, num) %>%
   nest(-type, -mesh_code) %>%
@@ -528,9 +526,9 @@ use_rate_output <- read_csv("old/distance.csv") %>%
 for (i in 1 : length(distance1)) { # i: 施設種別
   for (j in 1 : length(distance1[[i]])) { # j: メッシュ
     for (k in 1 : length(distance1[[i]][[j]])) { # k: 施設
-      use_rate_output[i,]$data[[1]][j,]$data[[1]][k,]$use_rate <- distance2[[i]][[j]][[k]]$use_rate
-      use_rate_output[i,]$data[[1]][j,]$data[[1]][k,]$user <- distance2[[i]][[j]][[k]]$user
-      use_rate_output[i,]$data[[1]][j,]$data[[1]][k,]$userXdistance <- distance2[[i]][[j]][[k]]$userXdistance
+      use_rate_output$data[[i]]$data[[j]]$use_rate[[k]] <- distance2[[i]][[j]][[k]]$use_rate
+      use_rate_output$data[[i]]$data[[j]]$user[[k]] <- distance2[[i]][[j]][[k]]$user
+      use_rate_output$data[[i]]$data[[j]]$userXdistance[[k]] <- distance2[[i]][[j]][[k]]$userXdistance
     }
   }
 }
@@ -544,11 +542,11 @@ use_rate_disp <- use_rate_output1 %>%
   nest(-type)
 
 for (i in 1 : length(distance1)) { # i: 施設種別
-  use_rate_disp[i,]$data[[1]] %<>%
+  use_rate_disp$data[[i]] %<>%
     mutate(disp = NA)
   
   for (j in 1 : length(distance1[[i]])) { # j: メッシュ
-    use_rate_disp[i,]$data[[1]][j,]$disp <- use_rate_disp[i,]$data[[1]][j,]$data[[1]]$use_rate %>% var()
+    use_rate_disp$data[[i]]$disp[[j]] <- use_rate_disp$data[[i]]$data[[j]]$use_rate %>% var()
   }
 }
 
@@ -556,3 +554,172 @@ use_rate_disp1 <- use_rate_disp %>%
   unnest(data) %>%
   select(-data)
 
+# cost <- tibble(mesh = mesh_codes, type = list(facility_type)) %>% unnest(type)
+
+type <- tibble(type = facility_type, num = list(0:1, 0:5, 0:1, 0:12, 0:2, 0:3, 0:2, 0:5, 0:4, 0:1)) %>%
+  unnest(num) %>%
+  mutate(cost = NA) %>%
+  nest(cost) %>%
+  nest(-type)
+
+# cost %<>%
+#   left_join(type, by = "type") %>%
+#   unnest(num)
+
+use_rate_temp <- use_rate_output1 %>%
+  nest(distance, use_rate, user, userXdistance) %>%
+  nest(-num, -type) %>%
+  nest(-type)
+
+for (i in 1 : nrow(use_rate_temp)) { # i: 施設種別
+  for (j in 1 : nrow(use_rate_temp$data[[i]])) { # j: 施設
+    sum <- 0
+    
+    for (k in 1 : nrow(use_rate_temp$data[[i]])) { # k: 施設
+      for (l in 1 : nrow(use_rate_temp$data[[i]]$data[[k]])) { # l: メッシュ
+        
+        if (j == k) {
+          userXdistance <- 0
+        } else if (i == 10 && use_rate_temp$data[[i]]$data[[k]]$data[[l]]$user == 0) {
+          user <- use_rate_temp$data[[i]]$data[[j]]$data[[l]]$user
+          userXdistance <- user * use_rate_temp$data[[i]]$data[[k]]$data[[l]]$distance
+        } else {
+          user <-
+            use_rate_temp$data[[i]]$data[[k]]$data[[l]]$user / (1 - use_rate_temp$data[[i]]$data[[j]]$data[[l]]$use_rate)
+          userXdistance <- user * use_rate_temp$data[[i]]$data[[k]]$data[[l]]$distance
+        }
+        
+        sum <- sum + userXdistance
+      }
+    }
+    
+    type$data[[i]]$data[[j]]$cost <- sum
+  }
+}
+
+type1 <- type %>%
+  unnest(data) %>%
+  unnest(data)
+
+cost <- tibble(type = facility_type, cost = NA)
+use_rate_output2 <- use_rate_output1 %>%
+  nest(-type)
+
+for (i in 1 : nrow(use_rate_temp)) {
+  cost$cost[[i]] <- use_rate_output2$data[[i]]$userXdistance %>%
+    sum()
+}
+
+user <- tibble(type = facility_type, user = NA)
+for (i in 1 : nrow(use_rate_temp)) {
+  user$user[[i]] <- use_rate_output2$data[[i]]$user %>%
+    sum()
+}
+
+
+cost %<>%
+  mutate(cost_before = cost) %>%
+  select(-cost)
+
+type1 %<>%
+  mutate(cost_after = cost) %>%
+  select(-cost)
+
+type2 <- type1 %>%
+  left_join(cost, by = "type") %>%
+  mutate(cost_delta = cost_after - cost_before) %>%
+  left_join(user, by = "type") %>%
+  mutate(cost_delta_per_capita = cost_delta / user)
+
+
+# 総移動距離最小化
+# 最小化対象となる関数
+
+facility <- tibble(type = facility_type, num = list(0:1, 0:5, 0:1, 0:12, 0:2, 0:3, 0:2, 0:5, 0:4, 0:1))
+area_total <- tibble(type = facility_type, area = NA)
+
+
+
+for (i in 1:length(facility_type)) { # i: 施設種別
+  sum <- 0
+  
+  for (j in facility$num[[i]] + 1) { # j: 施設番号
+    if (i == 2) { # 病院
+      sum <- sum + medical_facility1[[j]]$hospital_bed
+    } else if (i == 9) { # スーパー
+      sum <- sum + commercial_facility1[[j]]$area_m2
+    } else {
+      if (i >= 3 && i <= 8) {
+        i2 <- i - 1
+      } else if (i == 10) {
+        i2 <- 8
+      } else {
+        i2 <- i
+      }
+      
+      sum <- sum + public_facility1[[i2]][[j]]$area_m2
+    }
+  }
+  
+  area_total$area[[i]] <- sum
+}
+
+par <- c(0.6398631, 2.010507, 0.853016, 1.209198, 0, 1.738493, 0, 0.8526133, 0) # 変数
+
+calc_total_distance <- function(i, x) { # i: 施設種別, x: 施設規模(面積, 病床数)
+  res <- 0
+  
+  for (j in 1:length(mesh_codes)) { # j: メッシュ
+    huff_sum <- 0
+    
+    for (k in facility$num[[i]] + 1) { # k: 施設番号
+      if (k == length(facility$num[[i]])) {
+        huff_sum <- huff_sum + (area_total$area[i] - sum(x)) / (distance2[[i]][[j]][[k]]$distance ^ par[i])
+      } else {
+        huff_sum <- huff_sum + x[k] / (distance2[[i]][[j]][[k]]$distance ^ par[i])
+      }
+    }
+    
+    user <- 1 : length(population_2015_1[[j]]) %>%
+      map_dbl(function(l) { # l : 年齢
+        population_2015_1[[j]][[l]]$population * use_frequency1[[i]][[l]]$use_frequency
+      }) %>%
+      sum()
+    
+    for (k in facility$num[[i]] + 1) { # k: 施設番号
+      if (k == length(facility$num[[i]])) {
+        huff <- (area_total$area[i] - sum(x)) / (distance2[[i]][[j]][[k]]$distance ^ par[i]) 
+      } else {
+        huff <- x[k] / (distance2[[i]][[j]][[k]]$distance ^ par[i])
+      }
+      
+      res <- res + user * huff / huff_sum * distance2[[i]][[j]][[k]]$distance
+    }
+  }
+  
+  return(res)
+}
+
+g <- function(i,x) {
+  if (area_total$area[i] - sum(x) < 0) {
+    10 ^ 100
+  } else if (length(x[x<0]) > 0) {
+    10 ^ 100
+  } else {
+    0
+  }
+}
+
+calc_total_distance1 <- function(i,x) {calc_total_distance(i,x) + g(i,x)}
+
+
+
+optim(c(0), function (x) {calc_total_distance1(1,x)}, method = "Brent", lower = 0, upper = 8874)
+# (7789.981, 1084.019)
+# value: 574785264 m
+
+optim(c(0,0,0,0,100), function (x) {calc_total_distance1(2,x)})
+
+for (i in 2:9) {
+  optim(c(0,0,0,0,0), function (x) {calc_total_distance1(i,x)}, method = "SANN")
+}
