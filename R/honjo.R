@@ -716,13 +716,170 @@ calc_total_distance1 <- function(i,x) {calc_total_distance(i,x) + g(i,x)}
 
 optim(c(0), function (x) {calc_total_distance1(1,x)}, method = "Brent", lower = 0, upper = 8874)
 # (7789.981, 1084.019)
-# value: 574785264 m
+# value: 574,785,264 m
 
 optim(c(0,0,0,0,0), function (x) {calc_total_distance1(2,x)})
 # (52.77539, 53.59706, 92.21750, 154.22759, 133.27675, 94.90571)
-# value: 3472072461 m
+# value: 3,472,072,461 m
 
+# i == 3
+# (498.868, 434.132)
+# value: 189,916,223 m
+# (865.8884, ---)
+# value: 182,429,391 m
+
+
+optim(rep(0, length(facility$num[[3]]) - 1), function (x) {calc_total_distance1(3,x)}, method = "SANN")
 
 for (i in 3:9) {
-  optim(rep(0, length(facility$num[[i]]) - 1), function (x) {calc_total_distance1(i,x)}, method = "SANN")
+  print(paste("--------", i, "--------"))
+  print(optim(rep(0, length(facility$num[[i]]) - 1), function (x) {calc_total_distance1(i,x)}, method = "SANN"))
+}
+
+for (i in 2:9) {
+  print(paste("--------", i, "--------"))
+  print(optim(rep(area_total$area[i] / length(facility$num[[i]]) - 1, length(facility$num[[i]]) - 1), function (x) {calc_total_distance1(i,x)}, method = "SANN"))
+}
+
+public_facility2 <- public_facility %>%
+  nest(-type) %>%
+  arrange(type)
+
+for (i in 3:9) {
+  print(paste("--------", i, "--------"))
+  
+  if (i == 2) { # 病院
+    s <- medical_facility$hospital_bed[1:(length(facility$num[[i]]) - 1)]
+  } else if (i == 9) { # スーパー
+    s <- commercial_facility$area_m2[1:(length(facility$num[[i]]) - 1)]
+  } else {
+    if (i >= 3 && i <= 8) {
+      i2 <- i - 1
+    } else if (i == 10) {
+      i2 <- 8
+    } else {
+      i2 <- i
+    }
+    
+    s <- public_facility2$data[[i2]]$area_m2[1:(length(facility$num[[i]]) - 1)]
+  }
+  
+  print(optim(s, function (x) {calc_total_distance1(i,x)}, method = "SANN"))
+}
+
+# [1] "-------- 2 --------"
+# $par
+# [1]  52.74168  53.58270  92.24684 154.22377 133.31243
+# $value
+# [1] 3472072474
+# 収束 & ◎
+
+# [1] "-------- 3 --------"
+# $par
+# [1] 865.8886
+# $value
+# [1] 182429391
+# 収束 & ◎
+
+# [1] "-------- 4 --------"
+# $par
+# [1] 1.188787e+03 4.153997e+02 5.782893e+02 1.087967e+03 1.936100e+03 3.902561e+02 1.077406e+02 1.557834e-04
+# [9] 1.777444e-04 1.421468e+01 1.564071e+03 1.306565e+02
+# $value
+# [1] 807693921
+# 収束 & ◎
+
+
+
+# [1] "-------- 5 --------"
+# $par
+# [1] 5.889035e-06 5.391469e-06
+# $value
+# [1] 165786110
+# 収束 & ◎
+
+
+# [1] "-------- 6 --------"
+# $par
+# [1] 1034.0077  426.9638 1195.7450
+# $value
+# [1] 237117969
+# 収束 & ◎
+
+
+# [1] "-------- 7 --------"
+# $par
+# [1] 7.100000e+02 1.541293e-05
+# $value
+# [1] 113022067
+# 収束 & ○
+
+# [1] "-------- 8 --------"
+# $par
+# [1] 1.067792e+04 6.727142e-04 4.377684e-03 1.371831e+03 1.652721e+03
+# $value
+# [1] 1628641464
+# 収束 & ○
+
+
+# [1] "-------- 9 --------"
+# $par
+# [1] 1.823405e+04 2.006490e-04 1.674895e+04 4.958497e-04
+# $value
+# [1] 32339745132
+# 収束 & △
+
+for (i in 2:9) {
+  print(paste("--------", i, "--------"))
+  
+  print(optim(rep(area_total$area[i] / length(facility$num[[i]]) - 1, length(facility$num[[i]]) - 1), function (x) {calc_total_distance1(i,x)}, method = "SANN"))
+}
+
+par1 <- list(c(52.80104,53.59158,92.18381,154.19881,133.28055),
+            c(865.8886),
+            c(1.188895e+03,4.098005e+02,5.790303e+02,1.085774e+03,1.937060e+03,3.900983e+02,1.106556e+02,1.512622e-03,1.878734e-03,1.321827e+01,1.571621e+03,1.291475e+02),
+            c(0.0016889395,0.0003616966),
+            c(1034.0077,426.9638,1195.7450),
+            c(643.34234,66.64962),
+            c(2827.4528,480.6773,1473.0287,1210.4129,7524.9970),
+            c(11422.685,5267.759,13213.767,1592.885))
+
+for (i in 9:3) {
+  j <- 0
+  k <- TRUE
+  
+  ans <- optim(par1[[i-1]], function (x) {calc_total_distance1(i,x)}, method = "Nelder-Mead")
+  
+  while ((j < 30) && k) {
+    if (ans$convergence == 0) {
+      k <- FALSE
+    }
+    
+    ans <- optim(ans$par, function (x) {calc_total_distance1(i,x)}, method = "Nelder-Mead")
+    
+    j <- j + 1
+  }
+  
+  print(paste("--------", i, "--------"))
+  print(ans)
+}
+
+for (i in 9:4) {
+  j <- 0
+  k <- TRUE
+  
+  ans <- optim(rep(0, length(par1[[i-1]])), function (x) {calc_total_distance1(i,x)}, method = "Nelder-Mead")
+  
+  while ((j < 30) && k) {
+    if (ans$convergence == 0) {
+      k <- FALSE
+    }
+    
+    ans <- optim(ans$par, function (x) {calc_total_distance1(i,x)}, method = "Nelder-Mead")
+    
+    j <- j + 1
+  }
+  
+  print(paste("--------", i, "--------"))
+  print(ans)
 }
