@@ -883,3 +883,153 @@ for (i in 9:4) {
   print(paste("--------", i, "--------"))
   print(ans)
 }
+
+par <- c(0.6398631, 2.010507, 0.853016, 1.209198, 0, 1.738493, 0, 0.8526133, 0) # 変数
+
+par11 <- list(c(7789.981, 1084.019),
+              c(52.74168, 53.58270, 92.24684, 154.22377, 133.31243, 104.8926),
+              c(865.8886, 67.1114),
+              c(1.188787e+03, 4.153997e+02, 5.782893e+02, 1.087967e+03, 1.936100e+03, 3.902561e+02, 1.077406e+02, 1.557834e-04, 1.777444e-04, 1.421468e+01, 1.564071e+03, 1.306565e+02, 129.5178),
+              c(5.889035e-06, 5.391469e-06, 815),
+              c(1034.0077,426.9638,1195.7450, 51.2835),
+              c(7.100000e+02,1.541293e-05, 1.541293e-05),
+              c(1.067792e+04,6.727142e-04,4.377684e-03,1.371831e+03,1.652721e+03,3377.523),
+              c(1.823405e+04,2.006490e-04,1.674895e+04,4.958497e-04,0))
+
+use_rate_output3 <- use_rate_output
+
+for (i in 1:(length(use_rate_output3$type)-1)) {
+  for (j in 1:length(use_rate_output3$data[[i]]$mesh_code)) {
+    use_rates <- rep(0, nrow(use_rate_output3$data[[i]]$data[[j]]))
+    us <- rep(0, nrow(use_rate_output3$data[[i]]$data[[j]]))
+    
+    for (k in 1:nrow(use_rate_output3$data[[i]]$data[[j]])) {
+      us[k] <- par11[[i]][k] / distance1[[i]][[j]][[k]]$distance ^ par[i]
+    }
+    
+    use_rates <- us / sum(us)
+    
+    use_rate_output3$data[[i]]$data[[j]]$use_rate <- use_rates
+  }
+}
+# xは正のみ
+# ハフモデル(対数じゃない版)
+calc_use_rate2 <- function(i) {
+  users <- rep(0, length(distance1[[i]][[1]])) # 汚い
+  use_rates <- rep(0, length(distance1[[i]][[1]])) # 汚い
+  
+  for (j in 1 : length(distance1[[i]])) { # j : メッシュ
+    sum = 0
+    us <- rep(0, length(distance1[[i]][[j]]))
+    
+    for (k in 1 : length(distance1[[i]][[j]])) { # k : 施設番号
+      s <- par11[[i]][k]
+      
+      us[k] <- s / distance1[[i]][[j]][[k]]$distance ^ par[i]
+    }
+    
+    # メッシュ上の利用者数合計
+    user <- 1 : length(population_2015_1[[j]]) %>%
+      map_dbl(function(k) { # k : 年齢
+        population_2015_1[[j]][[k]]$population * use_frequency1[[i]][[k]]$use_frequency
+      }) %>%
+      sum()
+    
+    for (k in 1 : length(distance1[[i]][[j]])) {
+      p <- us[k] / sum(us) # あるメッシュある施設の施設選択率
+      
+      # 年齢ごとの利用回数合計
+      users[k] <- users[k] + p * user
+    }
+  }
+  
+  for (k in 1 : length(distance1[[i]][[1]])) {
+    use_rates[k] <- users[k] / sum(users)
+  }
+  
+  return(use_rates)
+}
+
+
+use_rate_output4 <- use_rate_output3 %>%
+  unnest(data) %>%
+  unnest(data) %>%
+  select(-distance, -user, -userXdistance)
+
+use_rate_disp2 <- use_rate_output4 %>%
+  nest(-type, -mesh_code) %>%
+  nest(-type)
+
+for (i in 1 : 9) { # i: 施設種別
+  use_rate_disp2$data[[i]] %<>%
+    mutate(disp = NA)
+  
+  for (j in 1 : length(distance1[[i]])) { # j: メッシュ
+    use_rate_disp2$data[[i]]$disp[[j]] <- use_rate_disp2$data[[i]]$data[[j]]$use_rate %>% var()
+  }
+}
+
+use_rate_disp3 <- use_rate_disp2 %>%
+  unnest(data) %>%
+  select(-data)
+
+use_rate_disp3 %<>%
+  mutate(sd = sqrt(disp))
+
+# このあたり注意
+use_rate_disp3 %<>% bind_rows(use_rate_disp11)
+
+use_rate_disp3 %<>%
+  nest(-mesh_code)
+
+use_rate_disp3 %<>%
+  mutate(sd_average = NA)
+
+for (i in 1:nrow(use_rate_disp3)) {
+  use_rate_disp3$sd_average[[i]] <- use_rate_disp3$data[[i]]$sd %>%
+    mean()
+}
+
+use_rate_disp3 %<>%
+  select(-data)
+
+facility_area <- facility %>%
+  unnest(num) %>%
+  mutate(area_before = NA) %>%
+  nest(-type)
+
+
+for (i in 1:10) {
+  if (i == 2) { # 病院
+    facility_area$data[[i]] <- medical_facility$hospital_bed[1:length(facility$num[[i]])]
+  } else if (i == 9) { # スーパー
+    facility_area$data[[i]] <- commercial_facility$area_m2[1:length(facility$num[[i]])]
+  } else {
+    if (i >= 3 && i <= 8) {
+      i2 <- i - 1
+    } else if (i == 10) {
+      i2 <- 8
+    } else {
+      i2 <- i
+    }
+    
+    facility_area$data[[i]] <- public_facility2$data[[i2]]$area_m2[1:length(facility$num[[i]])]
+  }
+}
+
+facility_area %<>%
+  left_join(facility, by = "type") %>%
+  unnest(data,num)
+
+facility_area %<>%
+  mutate(area_after = NA)
+
+facility_area1 <- facility_area %>%
+  nest(-type)
+
+for (i in 1:9) {
+  facility_area1$data[[i]]$area_after <- par11[[i]]
+}
+
+facility_area2 <- facility_area1 %>%
+  unnest(data)
