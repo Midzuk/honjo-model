@@ -1033,3 +1033,6 @@ for (i in 1:9) {
 
 facility_area2 <- facility_area1 %>%
   unnest(data)
+
+facility_area2 %<>%
+  mutate(rat = area_after / data)
